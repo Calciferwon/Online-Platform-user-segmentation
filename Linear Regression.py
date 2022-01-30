@@ -7,8 +7,8 @@ import statsmodels.api as sm
 from sklearn.linear_model import LinearRegression
 
 #load data into pandas dataframe..
-dataset1 = pd.read_csv(r'D:\DATest_Handshakes\Log.csv')
-dataset2 = pd.read_csv(r'D:\DATest_Handshakes\Users.csv')
+dataset1 = pd.read_csv(r'D:\Log.csv')
+dataset2 = pd.read_csv(r'D:\Users.csv')
 dataset = dataset1.merge(dataset2, on='UserID', how='inner')
 dataset = dataset.drop_duplicates()
 df = pd.DataFrame(dataset)
