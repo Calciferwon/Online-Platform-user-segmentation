@@ -1,4 +1,3 @@
-print("Hello, World!")
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -10,7 +9,6 @@ from sklearn.linear_model import LinearRegression
 dataset1 = pd.read_csv(r'D:\Log.csv')
 dataset2 = pd.read_csv(r'D:\Users.csv')
 dataset = dataset1.merge(dataset2, on='UserID', how='inner')
-dataset = dataset.drop_duplicates()
 df = pd.DataFrame(dataset)
 df.head()
 
@@ -18,6 +16,7 @@ df.head()
 df.info()
 
 #Recency estimation
+#Define now is on 15th July 2020 at 00:00:00am
 df['CreatedAt'] = pd.to_datetime(df['CreatedAt'])
 print(df['CreatedAt'])
 
@@ -71,7 +70,7 @@ for i in range(len(actlist)):
 freq = pd.DataFrame(res, columns =['UserID', 'Online Time'])
 print(freq)
 
-frequency_onl = freq.groupby('UserID',as_index=False)['Online Time'].apply(lambda x: (sum(x))/3600)
+frequency_onl = freq.groupby('UserID',as_index=False)['Online Time'].apply(lambda x: (sum(x))/3600/13)
 print(frequency_onl)
 
 frequency = frequency_log.merge(frequency_onl, on='UserID')
@@ -87,14 +86,14 @@ monetary.head()
 print(monetary)
 
 #RFM estimation based on Recency, Frequency and Monetary
-rf = recency.merge(frequency_log, on='UserID').drop(columns='LastOnlineTime')
+rf = recency.merge(frequency, on='UserID').drop(columns='LastOnlineTime')
 rfm = rf.merge(monetary, on='UserID')
 rfm.columns = ['UserID', 'Recency',
-               'Frequency LogOn', 'Monetary']
+               'Frequency LogOn', 'Frequency Online Time', 'Monetary']
 rfm.head()
 print(rfm)
 
-#Set Recency and Frequency(LogOn and Online) quartiles:
+#Set Recency and Frequency(LogOn Times) quartiles:
 def get_group1(Q1, Q2, Q3, value):
     if value < Q1:
         return '1'
@@ -107,6 +106,19 @@ def get_group1(Q1, Q2, Q3, value):
 fre_log_Q1, fre_log_Q2, fre_log_Q3 = rfm['Frequency LogOn'].quantile(
     [0.53, 0.666, 0.718])
 
+#Set Recency and Frequency(Online Time) quartiles:
+def get_group1(Q1, Q2, Q3, value):
+    if value < Q1:
+        return '1'
+    elif Q1 <= value < Q2:
+        return '2'
+    elif Q2 <= value < Q3:
+        return '3'
+    elif Q3 <= value:
+        return '4'
+fre_onl_Q1, fre_onl_Q2, fre_onl_Q3 = rfm['Frequency Online Time'].quantile(
+    [0.349, 0.468, 0.674])
+
 def get_group2(Q1, Q2, Q3, value):
     if value > Q1:
         return '1'
@@ -118,7 +130,6 @@ def get_group2(Q1, Q2, Q3, value):
         return '4'
 rec_Q1, rec_Q2, rec_Q3 = rfm['Recency'].quantile(
     [0.25, 0.5, 0.75])
-#fre_onl_Q1, fre_onl_Q2, fre_onl_Q3 = rfm['Frequency Online'].quantile([0.2743, 0.505, 0.693])
 
 rec_group = []
 for i in range(len(rfm)):
@@ -134,16 +145,37 @@ for i in range(len(rfm)):
 rfm['fre_log_group'] = fre_log_group
 print(fre_log_Q1, fre_log_Q2, fre_log_Q3)
 
+fre_onl_group = []
+for i in range(len(rfm)):
+    fre_onl = rfm.iloc[i]['Frequency Online Time']
+    fre_onl_group.append(get_group1(fre_onl_Q1, fre_onl_Q2, fre_onl_Q3, fre_onl))
+rfm['fre_onl_group'] = fre_onl_group
+print(fre_onl_Q1, fre_onl_Q2, fre_onl_Q3)
 
 #Compute rfm score and total score
 rfm['RFM_score'] = rfm['rec_group'] + \
-                   rfm['fre_log_group'] + \
-                   rfm['Monetary'].astype(str)
+                    rfm['fre_log_group'] + \
+                    rfm['fre_onl_group'] + \
+                    rfm['Monetary'].astype(str)
 rfm['Total_RFM_score'] = rfm['rec_group'].astype(int) + \
-                         rfm['fre_log_group'].astype(int) + \
-                         rfm['Monetary']
+                        rfm['fre_log_group'].astype(int) + \
+                        rfm['fre_onl_group'].astype(int) +\
+                        rfm['Monetary']
 rfm.head()
 print(rfm)
+
+print(rfm.groupby('RFM_score')['Monetary'].mean())
+print(rfm.groupby('Total_RFM_score')['Monetary'].mean())
+
+#Compute again rfm score and total score as the online time does not impact on rfm score
+rfm['RFM_score'] = rfm['rec_group'] + \
+                    rfm['fre_log_group'] + \
+                    rfm['Monetary'].astype(str)
+rfm['Total_RFM_score'] = rfm['rec_group'].astype(int) + \
+                        rfm['fre_log_group'].astype(int) + \
+                        rfm['Monetary']
+print(rfm.groupby('RFM_score')['Monetary'].mean())
+print(rfm.groupby('Total_RFM_score')['Monetary'].mean())
 
 print(rfm.groupby('RFM_score')['Monetary'].mean())
 print(rfm.groupby('Total_RFM_score')['Monetary'].mean())
